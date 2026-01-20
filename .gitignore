@@ -1,0 +1,4 @@
+**/experiments/
+**/logs/
+**/__pycache__/
+**/*.pth
