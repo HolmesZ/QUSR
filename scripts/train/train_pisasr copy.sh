@@ -1,37 +1,26 @@
 #!/bin/bash
 
-OUTPUT_DIR="experiments/train-qusr-uncertainty-$(date +'%m%d-%H%M%S')"
-
 # 设置日志文件路径
-LOG_DIR="$OUTPUT_DIR/logs"
+LOG_DIR="experiments/train-pisasr-uncertainty-new918/logs"
 mkdir -p $LOG_DIR
 
 # 生成带时间戳的日志文件名
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-LOG_FILE="$LOG_DIR/training_term_log_${TIMESTAMP}.txt"
+LOG_FILE="$LOG_DIR/training_log_${TIMESTAMP}.txt"
 
 echo "=== PiSA-SR Training with Uncertainty Estimation ===" | tee -a $LOG_FILE
 echo "Training started at: $(date)" | tee -a $LOG_FILE
 echo "Log file: $LOG_FILE" | tee -a $LOG_FILE
 echo "" | tee -a $LOG_FILE
 
-SD_DIR="/home/bd/super_resolution/sd/stable-diffusion-2-1-base"
-DATASET_BASE_DIR="/home/bd/super_resolution/text-qusr/dataset/qusr-dataset-256"
-
 # 启动训练
-# Avoid bitsandbytes triton import issues
-CUDA_VISIBLE_DEVICES="0" accelerate launch train_pisasr.py \
---pretrained_model_path="$SD_DIR" \
---pretrained_model_path_csd="$SD_DIR" \
---dataset_txt_paths="$DATASET_BASE_DIR/gt_path.txt" \
---dataset_test_folder="$DATASET_BASE_DIR/testfolder" \
---quality_prompt_path="$DATASET_BASE_DIR/lowlevel_prompt_q" \
---quality_prompt_gt_path="$DATASET_BASE_DIR/lowlevel_prompt_q_GT" \
---lr_bicubic_path="$DATASET_BASE_DIR/LR_Bicubic" \
---highquality_dataset_txt_paths=None \
---skip_eval \
---resolution_ori=256 \
---resolution_tgt=256 \
+python train_pisasr.py \
+--pretrained_model_path="/home/bd/super_resolution/sd/stable-diffusion-2-1-base" \
+--pretrained_model_path_csd="/home/bd/super_resolution/sd/stable-diffusion-2-1-base" \
+--dataset_txt_paths="preset/gt_path.txt" \
+# --highquality_dataset_txt_paths="preset/gt_selected_path.txt" \
+# 训练的时候看一下在测试集上效果什么样
+# --dataset_test_folder="preset/testfolder_RealSR" \
 --learning_rate=3e-5 \
 --train_batch_size=1 \
 --gradient_accumulation_steps=2 \
@@ -40,7 +29,7 @@ CUDA_VISIBLE_DEVICES="0" accelerate launch train_pisasr.py \
 --checkpointing_steps 500 \
 --seed 123 \
 --max_grad_norm=5.0 \
---output_dir="$OUTPUT_DIR" \
+--output_dir="experiments/train-qusr-uncertainty-new918" \
 --cfg_csd 7.5 \
 --timesteps1 1 \
 --lambda_lpips=2 \
@@ -52,7 +41,7 @@ CUDA_VISIBLE_DEVICES="0" accelerate launch train_pisasr.py \
 --null_text_ratio=0.0 \
 --align_method="adain" \
 --deg_file_path="params.yml" \
---tracker_project_name "QUSR_Uncertainty-$(date +'%m%d-%H%M%S')" \
+--tracker_project_name "QUSR_Uncertainty-new918" \
 --max_train_steps 30001 \
 --enable_uncertainty \
 --uncertainty_hidden_channels=64 \

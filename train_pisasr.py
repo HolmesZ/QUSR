@@ -20,8 +20,18 @@ from datetime import datetime
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 
+# 修复 triton/bitsandbytes 兼容性问题
+try:
+    import triton.runtime
+    if not hasattr(triton.runtime, 'driver'):
+        # Mock the driver import to avoid bitsandbytes failure
+        import types
+        triton.runtime.driver = types.ModuleType('driver')
+except ImportError:
+    pass
+
 # 添加IQA-PyTorch路径
-sys.path.append('/data2/Solar_Data/PiSA-SR/IQA-PyTorch-main')
+# sys.path.append('/data2/Solar_Data/PiSA-SR/IQA-PyTorch-main')
 import pyiqa
 
 import diffusers
@@ -42,7 +52,7 @@ import random
 def main(args):
     # 设置日志记录
     log_dir = Path(args.output_dir, "logs")
-    log_dir.mkdir(exist_ok=True)
+    log_dir.mkdir(parents=True, exist_ok=True)
     
     # 创建带时间戳的日志文件名
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -317,16 +327,17 @@ def main(args):
                 
                 # Uncertainty warmup: disable uncertainty for first 1000 steps
                 # NOTE: global_step is updated after optimizer step; here it reflects the previous step count
+                net_pisasr_model = net_pisasr.module if hasattr(net_pisasr, "module") else net_pisasr
                 use_uncertainty = (
-                    hasattr(net_pisasr.module, 'enable_uncertainty') and
-                    net_pisasr.module.enable_uncertainty and
+                    hasattr(net_pisasr_model, 'enable_uncertainty') and
+                    net_pisasr_model.enable_uncertainty and
                     uncertainty_map is not None and
                     global_step >= 0
                 )
 
                 loss_uncertainty = torch.tensor(0.0, device=x_tgt_pred.device)
                 if use_uncertainty:
-                    loss_uncertainty = net_pisasr.module.compute_uncertainty_loss(x_tgt_pred, x_tgt, uncertainty_map)
+                    loss_uncertainty = net_pisasr_model.compute_uncertainty_loss(x_tgt_pred, x_tgt, uncertainty_map)
                     # Apply uncertainty loss weight (matching UDR-S2Former: weight=1.0)
                     loss = loss + loss_uncertainty * args.lambda_uncertainty
                 

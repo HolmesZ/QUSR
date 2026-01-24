@@ -5,6 +5,7 @@
 
 import os
 import random
+from httpx import get
 import numpy as np
 import torch
 from PIL import Image
@@ -96,18 +97,21 @@ class PairedSRPreGenDataset(torch.utils.data.Dataset):
         # 质量提示路径
         self.quality_prompt_path = getattr(args, 'quality_prompt_path', '/data2/Solar_Data/PiSA-SR/preset/lowlevel_prompt_q')
         self.quality_prompt_gt_path = getattr(args, 'quality_prompt_gt_path', '/data2/Solar_Data/PiSA-SR/preset/lowlevel_prompt_q_GT')
+
+        self.lr_bicubic_path = getattr(args, 'lr_bicubic_path', '/哈哈哈哈哈')
+        print(f"预生成LR图像目录: {self.lr_bicubic_path}")
         
         if split == 'train':
-            # 预生成的全尺寸LR图像目录
-            self.lr_dir = "/data2/Solar_Data/PiSA-SR/preset/pre_generated_lr"
+            # 预生成的全尺寸LR图像目录，直接换成训练的低分辨率的路径就行(要插值成和HR一样的size)
+            self.lr_dir = self.lr_bicubic_path
             
             # 读取原始GT图像路径（用作HR）
             with open(args.dataset_txt_paths, 'r') as f:
                 self.gt_list = [line.strip() for line in f.readlines()]
             
-            if args.highquality_dataset_txt_paths is not None:
-                with open(args.highquality_dataset_txt_paths, 'r') as f:
-                    self.hq_gt_list = [line.strip() for line in f.readlines()]
+            # if args.highquality_dataset_txt_paths is not None:
+            #     with open(args.highquality_dataset_txt_paths, 'r') as f:
+            #         self.hq_gt_list = [line.strip() for line in f.readlines()]
             
             # 检查预生成LR目录是否存在
             if os.path.exists(self.lr_dir):
@@ -131,8 +135,10 @@ class PairedSRPreGenDataset(torch.utils.data.Dataset):
 
         elif split == 'test':
             # 验证集使用预生成的LR-HR图像对
-            self.input_folder = os.path.join(args.dataset_test_folder, "test_SR_bicubic")
+            self.input_folder = os.path.join(args.dataset_test_folder, "test_LR")
             self.output_folder = os.path.join(args.dataset_test_folder, "test_HR")
+            print(f"验证集LR目录: {self.input_folder}")
+            print(f"验证集HR目录: {self.output_folder}")
             self.lr_list = []
             self.gt_list = []
             
@@ -141,7 +147,7 @@ class PairedSRPreGenDataset(torch.utils.data.Dataset):
             
             # 为每个LR文件找到对应的HR文件
             for lr_name in lr_names:
-                if lr_name.endswith('.png') or lr_name.endswith('.jpg') or lr_name.endswith('.jpeg'):
+                if lr_name.endswith('.png') or lr_name.endswith('.jpg') or lr_name.endswith('.jpeg') or lr_name.endswith('.tif'):
                     # 从LR文件名中提取基础名称
                     base_name = os.path.splitext(lr_name)[0]
                     
@@ -150,9 +156,11 @@ class PairedSRPreGenDataset(torch.utils.data.Dataset):
                         f"{base_name}_gt.png",
                         f"{base_name}_gt.jpg",
                         f"{base_name}_gt.jpeg",
+                        f"{base_name}_gt.tif",
                         f"{base_name}.png", # 尝试与LR同名
                         f"{base_name}.jpg",
-                        f"{base_name}.jpeg"
+                        f"{base_name}.jpeg",
+                        f"{base_name}.tif"
                     ]
                     
                     # 查找存在的HR文件
@@ -173,12 +181,21 @@ class PairedSRPreGenDataset(torch.utils.data.Dataset):
             print(f"Found {len(self.lr_list)} LR-HR pairs for validation")
             assert len(self.lr_list) == len(self.gt_list)
             
-            # 验证集使用确定性变换（中心裁剪或直接resize）
-            val_transforms = []
-            if hasattr(args, 'resolution_ori') and args.resolution_ori:
-                val_transforms.append(transforms.CenterCrop((args.resolution_ori, args.resolution_ori)))
-            val_transforms.append(transforms.Resize((args.resolution_tgt, args.resolution_tgt)))
-            self.val_transform = transforms.Compose(val_transforms)
+            # # 验证集使用确定性变换（中心裁剪或直接resize）
+            # val_transforms = []
+            # # resolution_ori:  原始分辨率裁剪尺寸(Original Resolution for cropping)
+            # if hasattr(args, 'resolution_ori') and args.resolution_ori:
+            #     val_transforms.append(transforms.CenterCrop((args.resolution_ori, args.resolution_ori)))
+            # val_transforms.append(transforms.Resize((args.resolution_tgt, args.resolution_tgt)))
+            # self.val_transform = transforms.Compose(val_transforms)
+
+            # 验证集使用确定性变换
+            # 注意：对于超分辨率任务，LR图像通常比目标尺寸小，不应使用CenterCrop
+            # CenterCrop会对小于目标尺寸的图像填充黑边，导致输出异常
+            # 直接resize LR到目标尺寸以匹配训练时的处理方式
+            # 打印args所有参数
+            print("所有参数啊啊啊啊啊啊: " + str(args))
+            self.val_transform = transforms.Resize((args.resolution_tgt, args.resolution_tgt))
 
     def __len__(self):
         return len(self.gt_list)
@@ -268,7 +285,11 @@ class PairedSRPreGenDataset(torch.utils.data.Dataset):
             # 质量提示：始终使用LR质量
             use_gt_quality = False  
             
-            # 获取LR质量提示
+            # 获取LR质量提示（优先用文件名匹配，如 Potsdam_Train_8590.txt）
+            # base_name = os.path.splitext(img_name)[0]
+            # print(f"处理图像: {img_name}, 基础名称: {base_name}")
+            # quality_prompt = self.get_quality_prompt(base_name, use_gt=use_gt_quality)
+            # 原来的序号匹配：
             quality_prompt = self.get_quality_prompt(idx, use_gt=use_gt_quality)
             
             # 将质量提示添加到batch中

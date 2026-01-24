@@ -38,6 +38,8 @@ def parse_args(input_args=None):
     parser.add_argument("--highquality_dataset_txt_paths", default='/gt_selected_path.txt', type=str)
     parser.add_argument("--dataset_test_folder",
                         default="/testfolder")
+    parser.add_argument("--lr_bicubic_path", type=str, default="",
+                        help="Path to bicubic upsampled LR images directory for training")
     parser.add_argument("--null_text_ratio", default=0., type=float)
     parser.add_argument("--prob", default=0.5, type=float)
     parser.add_argument("--use_online_degradation", action="store_true", 
