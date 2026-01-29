@@ -558,11 +558,9 @@ class PiSASR(torch.nn.Module):
             # 数据加载器已经提供了LR质量提示，直接使用
             quality_prompts = batch["quality_prompts"]
         else:
-            # 使用默认的质量提示
-            quality_prompts = []
-            for i in range(bs):
-                quality_prompt = self.get_quality_prompt(i)
-                quality_prompts.append(quality_prompt)
+            # 使用默认的质量提示（仅在无法获取批次中的质量提示时）
+            default_prompt = "This image shows average quality with some details visible but could be improved."
+            quality_prompts = [default_prompt] * bs
 
         # Encode quality prompts
         quality_prompt_embeds = self.encode_prompt(quality_prompts)
@@ -892,8 +890,8 @@ class PiSASR_eval(nn.Module):
         # Get quality prompt if dual attention is enabled
         quality_prompt_embeds = None
         if self.enable_dual_attention:
-            # 始终使用LR质量提示，与训练保持一致
-            quality_prompt = self.get_quality_prompt(0)
+            # 使用默认的LR质量提示（推理时没有具体图像名称）
+            quality_prompt = "This image shows average quality with some details visible but could be improved."
             print(f"Debug - Quality prompt: {quality_prompt[:100]}...")  # 调试信息
             quality_prompt_embeds = self.encode_prompt([quality_prompt]).to(dtype=self.weight_dtype)
 

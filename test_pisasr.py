@@ -1,3 +1,13 @@
+# 修复 triton/bitsandbytes 兼容性问题
+try:
+    import triton.runtime
+    if not hasattr(triton.runtime, 'driver'):
+        # Mock the driver import to avoid bitsandbytes failure
+        import types
+        triton.runtime.driver = types.ModuleType('driver')
+except ImportError:
+    pass
+
 import os
 import argparse
 import numpy as np

@@ -285,12 +285,9 @@ class PairedSRPreGenDataset(torch.utils.data.Dataset):
             # 质量提示：始终使用LR质量
             use_gt_quality = False  
             
-            # 获取LR质量提示（优先用文件名匹配，如 Potsdam_Train_8590.txt）
-            # base_name = os.path.splitext(img_name)[0]
-            # print(f"处理图像: {img_name}, 基础名称: {base_name}")
-            # quality_prompt = self.get_quality_prompt(base_name, use_gt=use_gt_quality)
-            # 原来的序号匹配：
-            quality_prompt = self.get_quality_prompt(idx, use_gt=use_gt_quality)
+            # 获取LR质量提示（使用文件名匹配，如 Potsdam_Train_8590.txt）
+            base_name = os.path.splitext(img_name)[0]
+            quality_prompt = self.get_quality_prompt(base_name, use_gt=use_gt_quality)
             
             # 将质量提示添加到batch中
             example["quality_prompts"] = [quality_prompt]
@@ -316,6 +313,14 @@ class PairedSRPreGenDataset(torch.utils.data.Dataset):
             example["null_prompt"] = ""
             example["output_pixel_values"] = output_t
             example["conditioning_pixel_values"] = img_t
-            example["base_name"] = os.path.basename(self.lr_list[idx])
+            
+            # 获取图像基础名称
+            img_name = os.path.basename(self.lr_list[idx])
+            example["base_name"] = img_name
+            
+            # 获取质量提示：使用图像名称（去掉扩展名）查找对应的质量提示文件
+            base_name = os.path.splitext(img_name)[0]
+            quality_prompt = self.get_quality_prompt(base_name, use_gt=False)
+            example["quality_prompts"] = [quality_prompt]
 
             return example 
