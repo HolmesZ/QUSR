@@ -29,7 +29,11 @@ def pisa_sr(args):
 
     # Get all input images
     if os.path.isdir(args.input_image):
-        image_names = sorted(glob.glob(f'{args.input_image}/*.png'))
+        exts = ("*.png", "*.jpg", "*.jpeg", "*.tif", "*.tiff")
+        image_names = []
+        for ext in exts:
+            image_names.extend(glob.glob(os.path.join(args.input_image, ext)))
+        image_names = sorted(image_names)
     else:
         image_names = [args.input_image]
 

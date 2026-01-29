@@ -147,8 +147,14 @@ def main():
     init_imgs_names = []
     for dir_idx, init_dir in enumerate(args.inp_imgs):
         gt_dir = args.gt_imgs[dir_idx]
-        img_gt_list = sorted(glob.glob(os.path.join(gt_dir, '*.png')))
-        img_sr_list = sorted(glob.glob(os.path.join(init_dir, '*.png')))
+        exts = ('*.png', '*.jpg', '*.jpeg', '*.tif', '*.tiff')
+        img_gt_list = []
+        img_sr_list = []
+        for ext in exts:
+            img_gt_list.extend(glob.glob(os.path.join(gt_dir, ext)))
+            img_sr_list.extend(glob.glob(os.path.join(init_dir, ext)))
+        img_gt_list = sorted(img_gt_list)
+        img_sr_list = sorted(img_sr_list)
 
         dir_name = os.path.basename(os.path.normpath(init_dir))
         init_imgs_names.append(dir_name)
@@ -161,21 +167,30 @@ def main():
     # Iterate over each directory
     for dir_idx, init_dir in enumerate(args.inp_imgs):
         gt_dir = args.gt_imgs[dir_idx]
-        img_gt_list = sorted(glob.glob(os.path.join(gt_dir, '*.png')))
-        img_sr_list = sorted(glob.glob(os.path.join(init_dir, '*.png')))
+        exts = ('*.png', '*.jpg', '*.jpeg', '*.tif', '*.tiff')
+        img_gt_list = []
+        img_sr_list = []
+        for ext in exts:
+            img_gt_list.extend(glob.glob(os.path.join(gt_dir, ext)))
+            img_sr_list.extend(glob.glob(os.path.join(init_dir, ext)))
+        img_gt_list = sorted(img_gt_list)
+        img_sr_list = sorted(img_sr_list)
         dir_name = init_imgs_names[dir_idx]
 
         # Initialize accumulators for average metrics
         metrics_accum = {metric: 0.0 for metric in iqa_metrics.keys()}
+        processed_count = 0
 
         logger.info(f"Testing Directory: [{dir_name}]")
 
         # Iterate over each image pair
         for img_idx, sr_path in enumerate(img_sr_list):
-            # 修改文件名匹配逻辑：将LR4替换为HR
+            # 匹配GT文件名：优先同名，其次尝试LR4->HR
             img_name = os.path.basename(sr_path)
-            gt_name = img_name.replace('_LR4.png', '_HR.png')
-            gt_path = os.path.join(gt_dir, gt_name)
+            gt_path = os.path.join(gt_dir, img_name)
+            if not os.path.exists(gt_path):
+                gt_name = img_name.replace('_LR4.png', '_HR.png')
+                gt_path = os.path.join(gt_dir, gt_name)
             
             # 检查参考图像是否存在
             if not os.path.exists(gt_path):
@@ -207,6 +222,7 @@ def main():
             # Accumulate metrics
             for name in metrics_accum:
                 metrics_accum[name] += metrics[name]
+            processed_count += 1
 
             # Calculate runtime
             end_time = time.time()
@@ -217,8 +233,11 @@ def main():
             logger.info(f"{dir_name}/{img_name} | {metrics_str} | Runtime: {runtime:.2f} sec")
 
         # Compute average metrics
-        num_images = len(img_sr_list)
-        avg_metrics = {k: round(v / num_images, 4) for k, v in metrics_accum.items()}
+        if processed_count == 0:
+            logger.warning(f"No valid image pairs processed for [{dir_name}]. Skipping average metrics and FID.")
+            continue
+
+        avg_metrics = {k: round(v / processed_count, 4) for k, v in metrics_accum.items()}
 
         # Compute FID for the directory
         fid_start_time = time.time()
